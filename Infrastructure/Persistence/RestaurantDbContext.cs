@@ -39,9 +39,17 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<Product>()
                 .OwnsOne(p => p.Price, mv =>
                 {
-                    mv.Property(m => m.Amount).HasColumnName("PriceAmount");
+                    mv.Property(m => m.Amount)
+                        .HasColumnName("PriceAmount")
+                        .HasColumnType("decimal(18,2)"); // Explicit precision and scale
                     mv.Property(m => m.Currency).HasColumnName("PriceCurrency");
                 });
+
+
+            modelBuilder.Entity<Product>()
+                .HasOne(p => p.Category)
+                .WithMany()
+                .HasForeignKey("CategoryId"); // Use shadow property or add CategoryId to Product
 
             base.OnModelCreating(modelBuilder);
         }
