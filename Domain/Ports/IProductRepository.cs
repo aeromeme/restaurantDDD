@@ -12,5 +12,7 @@ namespace Domain.Ports
         void Delete(Product product);
         Task<Product?> GetByIdAsync(ProductId id);
         Task<IReadOnlyList<Product>> GetAllAsync();
+
+        Task<(int Count,IReadOnlyList<Product>)> GetPaged(string? searchTerm, string? sortBy, int pageNumber, int pageSize);
     }
 }

@@ -32,9 +32,25 @@ namespace Application.UseCase.ProductCase
         public async Task<IResult<ProductDto?>> GetById(ProductId id)
         {
             var data= await _productRepository.GetByIdAsync(id);
-            if (data == null) return Result<ProductDto?>.Fail("Product found");
+            if (data == null) return Result<ProductDto?>.Fail("Product not found");
             var product = ProductMapper.ToDto( data);
             return Result<ProductDto?>.Ok(product);
+        }
+        public async Task<IResult<PagedProductListDto>> GetPaged (string? searchTerm, string? sortBy, int pageNumber, int pageSize)
+        {
+            var (totalItems, products) = await _productRepository.GetPaged(searchTerm, sortBy, pageNumber, pageSize);
+
+            var productDtos = products.Select(ProductMapper.ToDto).ToList();
+
+            var pagedResult = new PagedProductListDto
+            {
+                Items = productDtos,
+                TotalCount = totalItems,
+                PageNumber = pageNumber,
+                PageSize = pageSize
+            };
+
+            return Result<PagedProductListDto>.Ok(pagedResult);
         }
 
         public async Task<IResult<ProductDto>> AddEntity(ProductCreateDto dto)
@@ -42,6 +58,7 @@ namespace Application.UseCase.ProductCase
             var categoryId = new CategoryId(dto.CategoryId);
             var category = await _categoryRepository.GetByIdAsync(categoryId);
             if (category == null) throw new ApplicationException("Category not found");
+            dto.Currency = "USD";
             var product = new Product(dto.Name, new Money(dto.Price, dto.Currency), dto.Stock, category);
              _productRepository.Add(product);
             await _unitOfWork.SavesChangesAsync();
@@ -55,7 +72,7 @@ namespace Application.UseCase.ProductCase
 
         public async Task<IResult<ProductDto>> UpdateEntity(ProductUpdateDto dto)
         {
-            var productId = new ProductId(dto.Id);
+            var productId = new ProductId(dto.ProductId);
             var existingProduct = await _productRepository.GetByIdAsync(productId);
             if (existingProduct == null)
                 throw new ApplicationException("Product not found");

@@ -7,7 +7,7 @@ namespace Application.DTOs
     {
         public bool IsActive { get; set; }
 
-        public Guid Id { get; set; }
+        public Guid ProductId { get; set; }
 
         public CategoryDto Category { get; set; } = null!;
 
@@ -18,7 +18,7 @@ namespace Application.DTOs
     }
     public class ProductUpdateDto : ProductDtoBase
     {
-        public Guid Id { get; set; }
+        public Guid ProductId { get; set; }
         public Guid CategoryId { get; set; }
     }
     public class ProductDtoBase

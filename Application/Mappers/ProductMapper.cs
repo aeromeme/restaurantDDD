@@ -10,7 +10,7 @@ namespace Application.Mappers
         {
             return new ProductDto
             {
-                Id = product.Id.Value,
+                ProductId = product.Id.Value,
                 Name = product.Name,
                 Price = product.Price.Amount,
                 Currency = product.Price.Currency,

@@ -18,7 +18,10 @@ namespace Infrastructure.Repositories
             _restaurantDbContext.Set<TModel>().Add(item);
         }
 
-        
+        public IQueryable<TModel> GetQueryable()
+        {
+            return _restaurantDbContext.Set<TModel>().AsNoTracking();
+        }
 
         public void Update(TModel item)
         {

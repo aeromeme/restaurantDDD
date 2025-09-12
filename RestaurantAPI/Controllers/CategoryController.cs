@@ -25,5 +25,7 @@ namespace RestaurantAPI.Controllers
             return Ok(categories);
 
         }
+
+      
     }
 }

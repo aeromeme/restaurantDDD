@@ -17,39 +17,99 @@ namespace Infrastructure.Persistence
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // ProductId and CategoryId as value objects
-            modelBuilder.Entity<Product>()
-                .Property(p => p.Id)
-                .HasConversion(
-                    id => id.Value,
-                    value => new ProductId(value));
-
+   
             modelBuilder.Entity<Category>()
                 .Property(c => c.Id)
                 .HasConversion(
                     id => id.Value,
-                    value => new CategoryId(value));
+                    value => new CategoryId(value));    
 
-            // RowVersion for concurrency
-            modelBuilder.Entity<Product>()
-                .Property(p => p.RowVersion)
-                .IsRowVersion();
-
-            // Money value object conversion
-            modelBuilder.Entity<Product>()
-                .OwnsOne(p => p.Price, mv =>
+            modelBuilder.Entity<Product>(entity =>
+            {
+                entity.OwnsOne(p => p.Price, mv =>
                 {
                     mv.Property(m => m.Amount)
                         .HasColumnName("PriceAmount")
                         .HasColumnType("decimal(18,2)"); // Explicit precision and scale
                     mv.Property(m => m.Currency).HasColumnName("PriceCurrency");
                 });
-
-
-            modelBuilder.Entity<Product>()
-                .HasOne(p => p.Category)
+                entity.HasOne(p => p.Category)
                 .WithMany()
-                .HasForeignKey("CategoryId"); // Use shadow property or add CategoryId to Product
+                .HasForeignKey("CategoryId");
+
+                entity.Property(p => p.RowVersion)
+                .IsRowVersion();
+
+                entity.Property(p => p.Id)
+                .HasConversion(
+                    id => id.Value,
+                    value => new ProductId(value));
+            });
+              
+                 // Use shadow property or add CategoryId to Product
+
+            modelBuilder.Entity<Customer>(entity =>
+            {
+                entity.Property(c => c.Id)
+                    .HasConversion(
+                        id => id.Value,
+                        value => new CustomerId(value))
+                    ;
+                entity.Property(c=> c.Name)
+                    .IsRequired()
+                    .HasMaxLength(100);
+
+                entity.Property(c => c.Email)
+                .IsRequired()
+                .HasMaxLength(250);
+
+                entity.HasIndex(c => c.Email)
+                    .IsUnique();
+            });
+
+            modelBuilder.Entity<Order>(entity =>
+            {
+                entity.Property(c => c.Id)
+                  .HasConversion(
+                      id => id.Value,
+                      value => new OrderId(value));
+                entity.HasOne<Customer>()
+                    .WithMany()
+                    .HasForeignKey("CustomerId")
+                    .IsRequired();
+
+                entity.HasMany(o => o.LineItems)
+                    .WithOne()
+                    .HasForeignKey("OrderId");
+
+
+            });
+
+            modelBuilder.Entity<LineItem>(entity =>
+            {
+                entity.Property(c => c.Id)
+                  .HasConversion(
+                      id => id.Value,
+                      value => new LineItemId(value));
+                entity.OwnsOne(li => li.Price, mv =>
+                {
+                    mv.Property(m => m.Amount)
+                        .HasColumnName("LineItemPriceAmount")
+                        .HasColumnType("decimal(18,2)"); // Explicit precision and scale
+                    mv.Property(m => m.Currency).HasColumnName("LineItemPriceCurrency");
+                });
+                entity.HasOne<Product>()
+                    .WithMany()
+                    .HasForeignKey(li=>li.ProductId)
+                    .IsRequired();
+                entity.Property(li => li.Quantity)
+                    .IsRequired();
+            });
+
+
+
+
+
 
             base.OnModelCreating(modelBuilder);
         }

@@ -12,7 +12,7 @@ namespace Application.Mappers
         {
             return new DTOs.CategoryDto
             {
-                Id = category.Id.Value,
+                CategoryId = category.Id.Value,
                 Name = category.Name,
                 Description = category.Description
             };
