@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Domain.ValueObjects;
 using System.Text.Json.Serialization;
 
 namespace Application.DTOs
@@ -9,25 +10,30 @@ namespace Application.DTOs
 
         public Guid ProductId { get; set; }
 
+        public Money Price { get; set; } = null!;
+
         public CategoryDto Category { get; set; } = null!;
 
     }
     public class ProductCreateDto : ProductDtoBase
     {
         public Guid CategoryId { get; set; }
+
+        public decimal Price { get; set; }
     }
     public class ProductUpdateDto : ProductDtoBase
     {
         public Guid ProductId { get; set; }
         public Guid CategoryId { get; set; }
+
+        public decimal Price { get; set; }
     }
-    public class ProductDtoBase
+    public abstract class ProductDtoBase
     {
 
-        [JsonIgnore] // Hides from JSON serialization and Swagger
-        public string Currency { get; set; } = string.Empty;
+        
         public string Name { get; set; } = string.Empty;
-        public decimal Price { get; set; }
+     
 
         public int Stock { get; set; }
 

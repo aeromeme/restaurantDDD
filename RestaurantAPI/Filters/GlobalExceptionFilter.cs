@@ -9,9 +9,17 @@ namespace RestaurantAPI.Filters
     {
         public void OnException(ExceptionContext context)
         {
-            if (context.Exception is DomainException)
+            Console.WriteLine(context.Exception.GetType().FullName);
+            if (context.Exception is DomainException domainEx)
             {
-                context.Result = new BadRequestObjectResult(new { error = context.Exception.Message });
+                if (!string.IsNullOrWhiteSpace(domainEx.ParamName))
+                {
+                    context.Result = new BadRequestObjectResult(new { error = domainEx.Message, param = domainEx.ParamName });
+                }
+                else
+                {
+                    context.Result = new BadRequestObjectResult(new { error = domainEx.Message });
+                }
                 context.ExceptionHandled = true;
             }
             else if (context.Exception is ApplicationException)
@@ -25,6 +33,7 @@ namespace RestaurantAPI.Filters
                 context.ExceptionHandled = true;
             }
             // Add more exception types as needed
+            Console.WriteLine(context.Exception.GetType().FullName);
         }
     }
 }

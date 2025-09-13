@@ -1,3 +1,4 @@
+using Domain.Exceptions;
 using System;
 using System.Globalization;
 
@@ -11,9 +12,9 @@ namespace Domain.ValueObjects
         public Money(decimal amount, string currency)
         {
             if (amount < 0)
-                throw new ArgumentException("Amount cannot be negative.", nameof(amount));
+                throw new DomainException("Amount cannot be negative.", nameof(amount));
             if (string.IsNullOrWhiteSpace(currency))
-                throw new ArgumentException("Currency is required.", nameof(currency));
+                throw new DomainException("Currency is required.", nameof(currency));
 
             Amount = amount;
             Currency = currency.ToUpper();

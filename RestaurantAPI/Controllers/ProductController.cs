@@ -47,6 +47,26 @@ namespace RestaurantAPI.Controllers
             return Ok(result.Data);
         }
 
+        [HttpPut("{id}")]
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> Put(Guid id, ProductUpdateDto dto)
+        {
+            if (id != dto.ProductId)
+                return BadRequest("Product ID mismatch.");
+
+            var result = await _productService.UpdateEntity(dto);
+            if (!result.Success)
+            {
+                if (result.Message.ToLower().Contains("not found", StringComparison.OrdinalIgnoreCase))
+                    return NotFound(result.Message);
+                return BadRequest(result.Message);
+            }
+            var productDto = result.Data;
+            return Ok(productDto);
+        }
+
         // --- Added Pagination Endpoint ---
         [HttpGet("paged")]
         [ProducesResponseType(typeof(PagedProductListDto), StatusCodes.Status200OK)]

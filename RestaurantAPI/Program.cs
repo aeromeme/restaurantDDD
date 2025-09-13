@@ -1,4 +1,5 @@
 using Application.UseCase.CategoryCase;
+using Application.UseCase.OrderCase;
 using Application.UseCase.ProductCase;
 using Domain.Entities;
 using Domain.Ports;
@@ -23,6 +24,7 @@ builder.Services.AddDbContext<RestaurantDbContext>(options =>
 //repositories
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<ICategoryRepository, CategoryRepository>();
+builder.Services.AddScoped<IOrderRepository, OrderRepository> ();
 
 
 //unit of work
@@ -36,6 +38,7 @@ builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 //use cases
 builder.Services.AddScoped<GetAllCategories>();
 builder.Services.AddScoped<ProductService>();
+builder.Services.AddScoped<OrderService>();
 
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

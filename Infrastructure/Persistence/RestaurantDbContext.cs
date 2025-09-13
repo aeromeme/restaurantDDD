@@ -10,6 +10,10 @@ namespace Infrastructure.Persistence
         public DbSet<Product> Products { get; set; } = null!;
         public DbSet<Category> Categories { get; set; } = null!;
 
+        public DbSet<Customer> Customer { get; set; } = null!;
+
+        public DbSet<Order> Order { get; set; } = null!;
+
         public RestaurantDbContext(DbContextOptions<RestaurantDbContext> options)
             : base(options)
         {
@@ -73,9 +77,9 @@ namespace Infrastructure.Persistence
                   .HasConversion(
                       id => id.Value,
                       value => new OrderId(value));
-                entity.HasOne<Customer>()
+                entity.HasOne(c=> c.Customer)
                     .WithMany()
-                    .HasForeignKey("CustomerId")
+                    .HasForeignKey(o=>o.CustomerId)
                     .IsRequired();
 
                 entity.HasMany(o => o.LineItems)
@@ -98,7 +102,7 @@ namespace Infrastructure.Persistence
                         .HasColumnType("decimal(18,2)"); // Explicit precision and scale
                     mv.Property(m => m.Currency).HasColumnName("LineItemPriceCurrency");
                 });
-                entity.HasOne<Product>()
+                entity.HasOne(p=> p.Product)
                     .WithMany()
                     .HasForeignKey(li=>li.ProductId)
                     .IsRequired();

@@ -12,8 +12,7 @@ namespace Application.Mappers
             {
                 ProductId = product.Id.Value,
                 Name = product.Name,
-                Price = product.Price.Amount,
-                Currency = product.Price.Currency,
+                Price = product.Price,
                 Stock = product.Stock,
                 IsActive = product.IsActive,
                 Category = CategoryMapper.ToDto(product.Category)

@@ -15,7 +15,9 @@ namespace Domain.Entities
         public ProductId ProductId { get; private set;}
         public int Quantity { get; private set; }
         public Money Price { get; private set; } = null!;
-        public LineItem(ProductId productId, int quantity, Money price)
+
+        public readonly Product? Product;
+        public LineItem(ProductId productId, int quantity, Money price, LineItemId? itemId=null)
         {
             if (quantity <= 0)
                 throw new ArgumentException("Quantity must be greater than zero.", nameof(quantity));
@@ -23,7 +25,7 @@ namespace Domain.Entities
                 throw new DomainException("Price must be positive.");
             if (string.IsNullOrEmpty(price.Currency))
                 throw new DomainException("Currency is required.");
-            Id = LineItemId.NewId();
+            Id = itemId ?? LineItemId.NewId();
             ProductId = productId;
             Quantity = quantity;
             Price = price;

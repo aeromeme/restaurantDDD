@@ -56,6 +56,7 @@ namespace Infrastructure.Repositories
             // Pagination (use async EF Core methods)
             var totalItems = await query.CountAsync();
             var products = await query
+                .Include(p => p.Category)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .Include(p => p.Category) // Ensure Category is included

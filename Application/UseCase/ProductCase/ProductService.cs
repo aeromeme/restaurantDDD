@@ -58,8 +58,8 @@ namespace Application.UseCase.ProductCase
             var categoryId = new CategoryId(dto.CategoryId);
             var category = await _categoryRepository.GetByIdAsync(categoryId);
             if (category == null) throw new ApplicationException("Category not found");
-            dto.Currency = "USD";
-            var product = new Product(dto.Name, new Money(dto.Price, dto.Currency), dto.Stock, category);
+            
+            var product = new Product(dto.Name, new Money(dto.Price, "USD"), dto.Stock, category);
              _productRepository.Add(product);
             await _unitOfWork.SavesChangesAsync();
             return Result<ProductDto>.Ok(ProductMapper.ToDto(product), "Product created successfully");
@@ -92,8 +92,8 @@ namespace Application.UseCase.ProductCase
                 existingProduct.ChangeName(dto.Name);
 
             // Update price if changed
-            if (existingProduct.Price.Amount != dto.Price || existingProduct.Price.Currency != dto.Currency)
-                existingProduct.ChangePrice(new Money(dto.Price, dto.Currency));
+            if (existingProduct.Price.Amount != dto.Price )
+                existingProduct.ChangePrice(new Money(dto.Price, "USD"));
 
             // Update stock if changed
             if (existingProduct.Stock != dto.Stock)
