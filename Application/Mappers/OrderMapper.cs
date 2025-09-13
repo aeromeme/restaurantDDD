@@ -18,7 +18,8 @@ namespace Application.Mappers
                     Quantity = item.Quantity,
                     Price = item.Price
                 }).ToList(),
-                OrderDate = order.OrderDate
+                OrderDate = order.OrderDate,
+                Status = order.Status
             };
         }
     }

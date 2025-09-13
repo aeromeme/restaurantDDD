@@ -19,6 +19,8 @@ namespace Application.DTOs
         public CustomerDto Customer { get; set; }=null!;
 
         public List<LineItemDto> LineItems { get; set; } = new List<LineItemDto>();
+
+        public string Status { get; set; } = null!;
     }
     public class OrderCreateDto : OrderDtoBase
     {
