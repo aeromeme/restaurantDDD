@@ -1,8 +1,7 @@
-﻿using System;
+﻿using Domain.Results;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Domain.Entities
 {
@@ -25,75 +24,90 @@ namespace Domain.Entities
         }
         private Order() { }
 
-        private void EnsureOrderIsModifiable()
+        private Result EnsureOrderIsModifiable()
         {
             if (Status == OrderStatus.Completed || Status == OrderStatus.Cancelled)
-                throw new InvalidOperationException("No changes allowed for completed or cancelled orders.");
+                return Result.Fail("No changes allowed for completed or cancelled orders.");
+            return Result.Ok();
         }
 
-        public void changeCustomer(CustomerId customerId)
+        public Result ChangeCustomer(CustomerId customerId)
         {
-            EnsureOrderIsModifiable();
+            var modifiable = EnsureOrderIsModifiable();
+            if (!modifiable.Success) return modifiable;
             CustomerId = customerId;
+            return Result.Ok();
         }
 
-        public bool addLine(LineItem item)
+        public Result AddLine(LineItem item)
         {
-            EnsureOrderIsModifiable();
+            var modifiable = EnsureOrderIsModifiable();
+            if (!modifiable.Success) return modifiable;
             if (item == null)
-                throw new ArgumentNullException(nameof(item), "LineItem is required.");
+                return Result.Fail("LineItem is required.");
 
             var existing = _lineItems.FirstOrDefault(li => li.ProductId == item.ProductId);
             if (existing != null)
             {
-                existing.ChangeQuantity(existing.Quantity + item.Quantity);
-                existing.ChangePrice(item.Price);
-                return false;
+                var quantityResult = existing.ChangeQuantity(existing.Quantity + item.Quantity);
+                if (!quantityResult.Success) return quantityResult;
+                var priceResult = existing.ChangePrice(item.Price);
+                if (!priceResult.Success) return priceResult;
+                return Result.Ok("Quantity updated for existing line item.");
             }
 
             _lineItems.Add(item);
-            return true;
+            return Result.Ok("Line item added.");
         }
 
-        public bool removeLine(LineItem item)
+        public Result RemoveLine(LineItem item)
         {
-            EnsureOrderIsModifiable();
+            var modifiable = EnsureOrderIsModifiable();
+            if (!modifiable.Success) return modifiable;
             if (item == null)
-                throw new ArgumentNullException(nameof(item), "LineItem is required.");
-            return _lineItems.Remove(item);
+                return Result.Fail("LineItem is required.");
+            if (!_lineItems.Remove(item))
+                return Result.Fail("LineItem not found.");
+            return Result.Ok("Line item removed.");
         }
 
-        public bool UpdateLine(LineItem updatedItem)
+        public Result UpdateLine(LineItem updatedItem)
         {
-            EnsureOrderIsModifiable();
+            var modifiable = EnsureOrderIsModifiable();
+            if (!modifiable.Success) return modifiable;
             var existing = _lineItems.FirstOrDefault(li => li.Id == updatedItem.Id);
             if (existing == null)
-                return false;
+                return Result.Fail("LineItem not found.");
 
-            existing.ChangeQuantity(updatedItem.Quantity);
-            existing.ChangePrice(updatedItem.Price);
-            return true;
+            var quantityResult = existing.ChangeQuantity(updatedItem.Quantity);
+            if (!quantityResult.Success) return quantityResult;
+            var priceResult = existing.ChangePrice(updatedItem.Price);
+            if (!priceResult.Success) return priceResult;
+            return Result.Ok("Line item updated.");
         }
 
-        public void ChangeStatus(string status)
+        public Result ChangeStatus(string status)
         {
             if (!OrderStatus.All.Contains(status))
-                throw new ArgumentException($"Invalid status: {status}");
-            EnsureOrderIsModifiable();
-            // Prevent completing an order with no line items
+                return Result.Fail($"Invalid status: {status}");
+
+            var modifiable = EnsureOrderIsModifiable();
+            if (!modifiable.Success) return modifiable;
+
             if (status == OrderStatus.Completed && !_lineItems.Any())
-                throw new InvalidOperationException("Cannot complete an order with no line items.");
+                return Result.Fail("Cannot complete an order with no line items.");
 
             Status = status;
+            return Result.Ok($"Order status changed to {status}.");
         }
     }
+
     public readonly record struct OrderId(Guid Value)
     {
         public static OrderId NewId() => new OrderId(Guid.NewGuid());
         public override string ToString() => Value.ToString();
     }
 
-    // Static class for predefined status values
     public static class OrderStatus
     {
         public const string Pending = "Pending";

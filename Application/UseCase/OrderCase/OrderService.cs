@@ -3,6 +3,7 @@ using Application.Mappers;
 using Domain.Entities;
 using Domain.Ports;
 using Domain.ValueObjects;
+using Domain.Results;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,13 +25,14 @@ namespace Application.UseCase.OrderCase
             _productRepository = productRepository;
             _orderRepository = orderRepository;
         }
+
         public async Task<IResult<IReadOnlyList<OrderDto>>> GetAll()
         {
             var data = await _orderRepository.GetAllAsync();
             var orders = data.Select(OrderMapper.ToDto).ToList();
             return Result<IReadOnlyList<OrderDto>>.Ok(orders);
         }
-        
+
         public async Task<IResult<OrderDto>> AddOrderAsync(OrderCreateDto orderDto)
         {
             var customerId = new CustomerId(orderDto.CustomerId);
@@ -41,16 +43,15 @@ namespace Application.UseCase.OrderCase
                 var productId = new ProductId(itemDto.ProductId);
                 var product = await _productRepository.GetByIdAsync(productId);
                 if (product == null)
-                    throw new ApplicationException($"Product with ID {itemDto.ProductId} not found.");
+                    return Result<OrderDto>.Fail($"Product with ID {itemDto.ProductId} not found.");
 
-                // Use product.Price instead of itemDto.Price
-                var lineItem = new LineItem(
-                    productId,
-                    itemDto.Quantity,
-                    product.Price
-                );
+                var lineItemResult = LineItem.Create(productId, itemDto.Quantity, product.Price);
+                if (!lineItemResult.Success || lineItemResult.Data == null)
+                    return Result<OrderDto>.Fail(lineItemResult.Message ?? "Invalid line item.");
 
-                order.addLine(lineItem);
+                var addResult = order.AddLine(lineItemResult.Data);
+                if (!addResult.Success)
+                    return Result<OrderDto>.Fail(addResult.Message ?? "Failed to add line item.");
             }
 
             _orderRepository.Add(order);
@@ -58,10 +59,11 @@ namespace Application.UseCase.OrderCase
 
             order = await _orderRepository.GetByIdAsync(order.Id);
             if (order == null)
-                throw new ApplicationException("Error retrieving the created order.");
+                return Result<OrderDto>.Fail("Error retrieving the created order.");
             var resultDto = OrderMapper.ToDto(order);
             return Result<OrderDto>.Ok(resultDto);
         }
+
         public async Task<IResult<OrderDto>> GetById(OrderId id)
         {
             var order = await _orderRepository.GetByIdAsync(id);
@@ -70,6 +72,7 @@ namespace Application.UseCase.OrderCase
             var orderDto = OrderMapper.ToDto(order);
             return Result<OrderDto>.Ok(orderDto);
         }
+
         public async Task<IResult<PagedOrderListDto>> GetPaged(string? searchTerm, string? sortBy, int pageNumber, int pageSize)
         {
             var (totalCount, orders) = await _orderRepository.GetPaged(searchTerm, sortBy, pageNumber, pageSize);
@@ -81,6 +84,7 @@ namespace Application.UseCase.OrderCase
             };
             return Result<PagedOrderListDto>.Ok(pagedResult);
         }
+
         public async Task<IResult> DeleteOrderAsync(OrderId id)
         {
             var order = await _orderRepository.GetByIdAsync(id);
@@ -90,6 +94,7 @@ namespace Application.UseCase.OrderCase
             await _unitOfWork.SavesChangesAsync();
             return Result.Ok();
         }
+
         public async Task<IResult<OrderDto>> UpdateOrderAsync(OrderUpdateDto orderDto)
         {
             var orderId = new OrderId(orderDto.OrderId);
@@ -99,32 +104,37 @@ namespace Application.UseCase.OrderCase
 
             if (existingOrder.CustomerId.Value != orderDto.CustomerId)
             {
-                existingOrder.changeCustomer(new CustomerId(orderDto.CustomerId));
+                var customerResult = existingOrder.ChangeCustomer(new CustomerId(orderDto.CustomerId));
+                if (!customerResult.Success)
+                    return Result<OrderDto>.Fail(customerResult.Message ?? "Failed to change customer.");
             }
 
             var incomingLineIds = orderDto.LineItems.Select(li => li.LineItemId).ToHashSet();
             var toDelete = existingOrder.LineItems.Where(li => !incomingLineIds.Contains(li.Id.Value)).ToList();
             foreach (var item in toDelete)
-                existingOrder.removeLine(item);
+            {
+                var removeResult = existingOrder.RemoveLine(item);
+                if (!removeResult.Success)
+                    return Result<OrderDto>.Fail(removeResult.Message ?? "Failed to remove line item.");
+            }
 
             foreach (var itemDto in orderDto.LineItems)
             {
                 var productId = new ProductId(itemDto.ProductId);
                 var product = await _productRepository.GetByIdAsync(productId);
                 if (product == null)
-                    throw new ApplicationException($"Product with ID {itemDto.ProductId} not found.");
+                    return Result<OrderDto>.Fail($"Product with ID {itemDto.ProductId} not found.");
 
-                // Use product.Price instead of itemDto.Price
-                var lineItem = new LineItem(
-                    productId,
-                    itemDto.Quantity,
-                    product.Price,
-                    new LineItemId(itemDto.LineItemId)
-                );
+                var lineItemResult = LineItem.Create(productId, itemDto.Quantity, product.Price, new LineItemId(itemDto.LineItemId));
+                if (!lineItemResult.Success || lineItemResult.Data == null)
+                    return Result<OrderDto>.Fail(lineItemResult.Message ?? "Invalid line item.");
 
-                if (!existingOrder.UpdateLine(lineItem))
+                var updateResult = existingOrder.UpdateLine(lineItemResult.Data);
+                if (!updateResult.Success)
                 {
-                    existingOrder.addLine(lineItem);
+                    var addResult = existingOrder.AddLine(lineItemResult.Data);
+                    if (!addResult.Success)
+                        return Result<OrderDto>.Fail(addResult.Message ?? "Failed to add line item.");
                 }
             }
 
@@ -133,10 +143,11 @@ namespace Application.UseCase.OrderCase
 
             existingOrder = await _orderRepository.GetByIdAsync(existingOrder.Id);
             if (existingOrder == null)
-                throw new ApplicationException("Error retrieving the updated order.");
+                return Result<OrderDto>.Fail("Error retrieving the updated order.");
             var resultDto = OrderMapper.ToDto(existingOrder);
             return Result<OrderDto>.Ok(resultDto);
         }
+
         public async Task<IResult<OrderDto>> CompleteOrderAsync(Guid Id)
         {
             var orderId = new OrderId(Id);
@@ -144,14 +155,9 @@ namespace Application.UseCase.OrderCase
             if (order == null)
                 return Result<OrderDto>.Fail("Order not found.");
 
-            try
-            {
-                order.ChangeStatus(OrderStatus.Completed);
-            }
-            catch (Exception ex)
-            {
-                return Result<OrderDto>.Fail(ex.Message);
-            }
+            var statusResult = order.ChangeStatus(OrderStatus.Completed);
+            if (!statusResult.Success)
+                return Result<OrderDto>.Fail(statusResult.Message ?? "Failed to complete order.");
 
             _orderRepository.Update(order);
             await _unitOfWork.SavesChangesAsync();
@@ -167,14 +173,9 @@ namespace Application.UseCase.OrderCase
             if (order == null)
                 return Result<OrderDto>.Fail("Order not found.");
 
-            try
-            {
-                order.ChangeStatus(OrderStatus.Cancelled);
-            }
-            catch (Exception ex)
-            {
-                return Result<OrderDto>.Fail(ex.Message);
-            }
+            var statusResult = order.ChangeStatus(OrderStatus.Cancelled);
+            if (!statusResult.Success)
+                return Result<OrderDto>.Fail(statusResult.Message ?? "Failed to cancel order.");
 
             _orderRepository.Update(order);
             await _unitOfWork.SavesChangesAsync();

@@ -1,13 +1,10 @@
 ﻿using Domain.Events;
 using Domain.Exceptions;
 using Domain.ValueObjects;
+using Domain.Results;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace Domain.Entities
 {
@@ -18,91 +15,102 @@ namespace Domain.Entities
         public Money Price { get; private set; } = null!;
         public int Stock { get; private set; }
         public bool IsActive { get; private set; }
-        public Category Category { get; private set; } = null!; // Add this line
-
+        public Category Category { get; private set; } = null!;
         public byte[] RowVersion { get; private set; } = Array.Empty<byte>();
 
-        public Product(string name, Money price, int stock, Category category)
+        private Product(string name, Money price, int stock, Category category)
         {
-            if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Product name is required.");
-            if (stock < 0)
-                throw new DomainException("Initial stock cannot be negative.");
-            if (price.Amount <= 0)
-                throw new DomainException("Price must be positive.");
-            if (category == null)
-                throw new DomainException("Category is required.");
-            if (string.IsNullOrEmpty(price.Currency))
-                throw new DomainException("Currency is required.");
-
-
             Id = ProductId.NewId();
             Name = name;
             Price = price;
             Stock = stock;
             IsActive = true;
-            Category = category; // Initialize the Category property
+            Category = category;
         }
 
-        private Product()
+        public static Result<Product> Create(string name, Money price, int stock, Category category)
         {
+            if (string.IsNullOrWhiteSpace(name))
+                return Result<Product>.Fail("Product name is required.");
+            if (stock < 0)
+                return Result<Product>.Fail("Initial stock cannot be negative.");
+            if (price == null || price.Amount <= 0)
+                return Result<Product>.Fail("Price must be positive.");
+            if (category == null)
+                return Result<Product>.Fail("Category is required.");
+            if (price != null && string.IsNullOrEmpty(price.Currency))
+                return Result<Product>.Fail("Currency is required.");
+
+            var product = new Product(name, price, stock, category);
+            return Result<Product>.Ok(product);
         }
 
         // --- State changing operations ---
-        public void ChangeCategory(Category category)
+        public Result ChangeCategory(Category category)
         {
             if (category == null)
-                throw new DomainException("Category is required.");
+                return Result.Fail("Category is required.");
             Category = category;
+            return Result.Ok();
         }
-        public void ChangeName(string name)
+
+        public Result ChangeName(string name)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new DomainException("Product name is required.");
+                return Result.Fail("Product name is required.");
             Name = name;
+            return Result.Ok();
         }
-        public void ChangePrice(Money newPrice)
+
+        public Result ChangePrice(Money newPrice)
         {
-            if (newPrice.Amount <= 0)
-                throw new DomainException("Price must be positive.");
+            if (newPrice == null || newPrice.Amount <= 0)
+                return Result.Fail("Price must be positive.");
             if (string.IsNullOrEmpty(newPrice.Currency))
-                throw new DomainException("Currency is required.");
+                return Result.Fail("Currency is required.");
             Price = newPrice;
+            return Result.Ok();
         }
 
-        public void IncreaseStock(int qty)
+        public Result IncreaseStock(int qty)
         {
-            if (qty <= 0) throw new DomainException("Quantity must be positive.");
+            if (qty <= 0)
+                return Result.Fail("Quantity must be positive.");
             Stock += qty;
+            return Result.Ok();
         }
 
-        public void ReduceStock(int qty)
+        public Result ReduceStock(int qty)
         {
-            if (qty <= 0) throw new DomainException("Quantity must be positive.");
-            if (Stock < qty) throw new DomainException("Not enough stock.");
+            if (qty <= 0)
+                return Result.Fail("Quantity must be positive.");
+            if (Stock < qty)
+                return Result.Fail("Not enough stock.");
             Stock -= qty;
 
             if (Stock == 0)
                 AddDomainEvent(new ProductOutOfStock(Id.Value));
+            return Result.Ok();
         }
 
         // --- Validation ---
         public bool IsAvailable(int qty) => Stock >= qty && IsActive;
 
         // --- Workflow ---
-        public void Deactivate()
+        public Result Deactivate()
         {
             if (Stock > 0)
-                throw new DomainException("Cannot deactivate a product with stock.");
+                return Result.Fail("Cannot deactivate a product with stock.");
             IsActive = false;
+            return Result.Ok();
         }
 
         // Domain events pattern (simplified)
         private readonly List<IDomainEvent> _events = new();
         public IReadOnlyCollection<IDomainEvent> Events => _events.AsReadOnly();
         private void AddDomainEvent(IDomainEvent e) => _events.Add(e);
-
     }
+
     public readonly record struct ProductId(Guid Value)
     {
         public static ProductId NewId() => new ProductId(Guid.NewGuid());

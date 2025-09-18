@@ -2,6 +2,7 @@
 using Application.UseCase.CategoryCase;
 using Application.UseCase.ProductCase;
 using Domain.Entities;
+using Domain.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System;
@@ -30,38 +31,65 @@ namespace RestaurantAPI.Controllers
         }
 
         [HttpGet("{Id}")]
-        [ProducesResponseType(typeof(Product), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetAllCategories(Guid Id)
+        [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<ProductDto>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result<ProductDto>), StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetById(Guid Id)
         {
             var productId = new ProductId(Id);   
-            var products = await _productService.GetById(productId);
-            return Ok(products.Data);
+            var result = await _productService.GetById(productId);
 
+            if (!result.Success)
+            {
+                if (result.Message != null && result.Message.ToLower().Contains("not found"))
+                    return NotFound(result);
+
+                return BadRequest(result);
+            }
+
+            if (result.Data == null)
+                return NotFound(Result<ProductDto>.Fail("Product not found"));
+
+            return Ok(result.Data);
         }
 
         [HttpPost]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<ProductDto>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result<ProductDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Post([FromBody] ProductCreateDto dto)
         {
             var result = await _productService.AddEntity(dto);
+
+            if (!result.Success)
+            {
+                if (result.Message != null && result.Message.ToLower().Contains("not found"))
+                    return NotFound(result);
+
+                return BadRequest(result);
+            }
+
+            if (result.Data == null)
+                return BadRequest(result);
+
             return Ok(result.Data);
         }
 
         [HttpPut("{id}")]
         [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(Result<ProductDto>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result<ProductDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Put(Guid id, ProductUpdateDto dto)
         {
             if (id != dto.ProductId)
-                return BadRequest("Product ID mismatch.");
+                return BadRequest(Result<ProductDto>.Fail("Product ID mismatch."));
 
             var result = await _productService.UpdateEntity(dto);
             if (!result.Success)
             {
                 if (result.Message.ToLower().Contains("not found", StringComparison.OrdinalIgnoreCase))
-                    return NotFound(result.Message);
-                return BadRequest(result.Message);
+                    return NotFound(result);
+                return BadRequest(result);
             }
             var productDto = result.Data;
             return Ok(productDto);

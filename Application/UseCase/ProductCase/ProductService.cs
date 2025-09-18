@@ -3,6 +3,7 @@ using Application.Mappers;
 using Domain.Entities;
 using Domain.Ports;
 using Domain.ValueObjects;
+using Domain.Results;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,10 +58,15 @@ namespace Application.UseCase.ProductCase
         {
             var categoryId = new CategoryId(dto.CategoryId);
             var category = await _categoryRepository.GetByIdAsync(categoryId);
-            if (category == null) throw new ApplicationException("Category not found");
-            
-            var product = new Product(dto.Name, new Money(dto.Price, "USD"), dto.Stock, category);
-             _productRepository.Add(product);
+            if (category == null)
+                return Result<ProductDto>.Fail("Category not found");
+
+            var resultProduct = Product.Create(dto.Name, new Money(dto.Price, "USD"), dto.Stock, category);
+            if (!resultProduct.Success || resultProduct.Data == null)
+                return Result<ProductDto>.Fail(resultProduct.Message ?? "Product creation failed");
+
+            var product = resultProduct.Data;
+            _productRepository.Add(product);
             await _unitOfWork.SavesChangesAsync();
             return Result<ProductDto>.Ok(ProductMapper.ToDto(product), "Product created successfully");
         }
@@ -75,7 +81,7 @@ namespace Application.UseCase.ProductCase
             var productId = new ProductId(dto.ProductId);
             var existingProduct = await _productRepository.GetByIdAsync(productId);
             if (existingProduct == null)
-                throw new ApplicationException("Product not found");
+                return Result<ProductDto>.Fail("Product not found");
 
             // Update category if changed
             if (existingProduct.Category.Id.Value != dto.CategoryId)
@@ -83,26 +89,40 @@ namespace Application.UseCase.ProductCase
                 var categoryId = new CategoryId(dto.CategoryId);
                 var category = await _categoryRepository.GetByIdAsync(categoryId);
                 if (category == null)
-                    throw new ApplicationException("Category not found");
-                existingProduct.ChangeCategory(category);
+                    return Result<ProductDto>.Fail("Category not found");
+                var categoryResult = existingProduct.ChangeCategory(category);
+                if (!categoryResult.Success)
+                    return Result<ProductDto>.Fail(categoryResult.Message ?? "Failed to change category");
             }
 
             // Update name if changed
             if (!string.Equals(existingProduct.Name, dto.Name, StringComparison.Ordinal))
-                existingProduct.ChangeName(dto.Name);
+            {
+                var nameResult = existingProduct.ChangeName(dto.Name);
+                if (!nameResult.Success)
+                    return Result<ProductDto>.Fail(nameResult.Message ?? "Failed to change name");
+            }
 
             // Update price if changed
-            if (existingProduct.Price.Amount != dto.Price )
-                existingProduct.ChangePrice(new Money(dto.Price, "USD"));
+            if (existingProduct.Price.Amount != dto.Price)
+            {
+                var priceResult = existingProduct.ChangePrice(new Money(dto.Price, "USD"));
+                if (!priceResult.Success)
+                    return Result<ProductDto>.Fail(priceResult.Message ?? "Failed to change price");
+            }
 
             // Update stock if changed
             if (existingProduct.Stock != dto.Stock)
             {
                 var diff = dto.Stock - existingProduct.Stock;
+                Result stockResult;
                 if (diff > 0)
-                    existingProduct.IncreaseStock(diff);
+                    stockResult = existingProduct.IncreaseStock(diff);
                 else
-                    existingProduct.ReduceStock(-diff);
+                    stockResult = existingProduct.ReduceStock(-diff);
+
+                if (!stockResult.Success)
+                    return Result<ProductDto>.Fail(stockResult.Message ?? "Failed to update stock");
             }
 
             _productRepository.Update(existingProduct);

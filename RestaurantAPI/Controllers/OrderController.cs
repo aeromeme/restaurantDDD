@@ -4,6 +4,7 @@ using Domain.ValueObjects;
 using System;
 using System.Threading.Tasks;
 using Application.DTOs;
+using Domain.Results;
 
 namespace RestaurantAPI.Controllers
 {
@@ -20,64 +21,83 @@ namespace RestaurantAPI.Controllers
 
         [HttpGet]
         [ProducesResponseType(typeof(IEnumerable<OrderDto>), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result<IReadOnlyList<OrderDto>>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Get()
         {
-            var orders = await _orderService.GetAll();
-            return Ok(orders.Data);
+            var result = await _orderService.GetAll();
+            if (!result.Success)
+                return BadRequest(result);
+            if (result.Data == null)
+                return BadRequest(Result<IReadOnlyList<OrderDto>>.Fail("No orders found."));
+            return Ok(result.Data);
         }
+
         [HttpPost]
         [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> Post([FromBody] OrderCreateDto dto)
         {
             var result = await _orderService.AddOrderAsync(dto);
+            if (!result.Success)
+                return BadRequest(result);
+            if (result.Data == null)
+                return BadRequest(Result<OrderDto>.Fail("Order creation failed."));
             return Ok(result.Data);
         }
+
         [HttpPut("{id}")]
         [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
-        [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status404NotFound)]
         public async Task<IActionResult> Put(Guid id, OrderUpdateDto dto)
         {
             if (id != dto.OrderId)
-                return BadRequest("Order ID mismatch.");
-            // Assuming you have an UpdateOrderAsync method in your OrderService
+                return BadRequest(Result<OrderDto>.Fail("Order ID mismatch."));
             var result = await _orderService.UpdateOrderAsync(dto);
             if (!result.Success)
-                return NotFound(result.Message);
+            {
+                if (result.Message != null && result.Message.ToLower().Contains("not found"))
+                    return NotFound(result);
+                return BadRequest(result);
+            }
+            if (result.Data == null)
+                return BadRequest(Result<OrderDto>.Fail("Order update failed."));
             return Ok(result.Data);
         }
 
         [HttpPost("{id}/complete")]
-        [ProducesResponseType(typeof(OrderDto), 200)]
-        [ProducesResponseType(404)]
-        [ProducesResponseType(400)]
+        [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CompleteOrder(Guid id)
         {
             var result = await _orderService.CompleteOrderAsync(id);
             if (!result.Success)
             {
-                if (result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-                    return NotFound(result.Message);
-                return BadRequest(result.Message);
+                if (result.Message != null && result.Message.ToLower().Contains("not found"))
+                    return NotFound(result);
+                return BadRequest(result);
             }
+            if (result.Data == null)
+                return BadRequest(Result<OrderDto>.Fail("Order completion failed."));
             return Ok(result.Data);
         }
 
         [HttpPost("{id}/cancel")]
-        [ProducesResponseType(typeof(OrderDto), 200)]
-        [ProducesResponseType(404)]
-        [ProducesResponseType(400)]
+        [ProducesResponseType(typeof(OrderDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status404NotFound)]
+        [ProducesResponseType(typeof(Result<OrderDto>), StatusCodes.Status400BadRequest)]
         public async Task<IActionResult> CancelOrder(Guid id)
         {
             var result = await _orderService.CancelOrderAsync(id);
             if (!result.Success)
             {
-                if (result.Message.Contains("not found", StringComparison.OrdinalIgnoreCase))
-                    return NotFound(result.Message);
-                return BadRequest(result.Message);
+                if (result.Message != null && result.Message.ToLower().Contains("not found"))
+                    return NotFound(result);
+                return BadRequest(result);
             }
+            if (result.Data == null)
+                return BadRequest(Result<OrderDto>.Fail("Order cancellation failed."));
             return Ok(result.Data);
         }
     }

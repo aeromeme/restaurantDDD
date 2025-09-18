@@ -1,54 +1,58 @@
 ﻿using Domain.Exceptions;
 using Domain.ValueObjects;
+using Domain.Results;
 using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Domain.Entities
 {
     public class LineItem
     {
         public LineItemId Id { get; private set; }
-        public ProductId ProductId { get; private set;}
+        public ProductId ProductId { get; private set; }
         public int Quantity { get; private set; }
         public Money Price { get; private set; } = null!;
-
         public readonly Product? Product;
-        public LineItem(ProductId productId, int quantity, Money price, LineItemId? itemId=null)
+
+        private LineItem(ProductId productId, int quantity, Money price, LineItemId? itemId = null)
         {
-            if (quantity <= 0)
-                throw new ArgumentException("Quantity must be greater than zero.", nameof(quantity));
-            if (price.Amount <= 0)
-                throw new DomainException("Price must be positive.");
-            if (string.IsNullOrEmpty(price.Currency))
-                throw new DomainException("Currency is required.");
             Id = itemId ?? LineItemId.NewId();
             ProductId = productId;
             Quantity = quantity;
             Price = price;
         }
-        private LineItem()
-        {
-        }
-        // --- State changing operations ---
-        public void ChangeQuantity(int quantity)
+
+        public static Result<LineItem> Create(ProductId productId, int quantity, Money price, LineItemId? itemId = null)
         {
             if (quantity <= 0)
-                throw new ArgumentException("Quantity must be greater than zero.", nameof(quantity));
-            Quantity = quantity;
+                return Result<LineItem>.Fail("Quantity must be greater than zero.");
+            if (price == null || price.Amount <= 0)
+                return Result<LineItem>.Fail("Price must be positive.");
+            if (price != null && string.IsNullOrEmpty(price.Currency))
+                return Result<LineItem>.Fail("Currency is required.");
+
+            var item = new LineItem(productId, quantity, price, itemId);
+            return Result<LineItem>.Ok(item);
         }
-        public void ChangePrice(Money newPrice)
+
+        public Result ChangeQuantity(int quantity)
         {
-            if (newPrice.Amount <= 0)
-                throw new DomainException("Price must be positive.");
-            if (string.IsNullOrEmpty(newPrice.Currency))
-                throw new DomainException("Currency is required.");
+            if (quantity <= 0)
+                return Result.Fail("Quantity must be greater than zero.");
+            Quantity = quantity;
+            return Result.Ok();
+        }
+
+        public Result ChangePrice(Money newPrice)
+        {
+            if (newPrice == null || newPrice.Amount <= 0)
+                return Result.Fail("Price must be positive.");
+            if (newPrice != null && string.IsNullOrEmpty(newPrice.Currency))
+                return Result.Fail("Currency is required.");
             Price = newPrice;
+            return Result.Ok();
         }
     }
+
     public readonly record struct LineItemId(Guid Value)
     {
         public static LineItemId NewId() => new LineItemId(Guid.NewGuid());
